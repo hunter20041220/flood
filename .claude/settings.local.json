@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(wc:*)",
+      "Bash(if exist \"d:\\\\progress\\\\code\\\\flood\\\\NUL\" del \"d:\\\\progress\\\\code\\\\flood\\\\NUL\")",
+      "Bash(tree:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}
