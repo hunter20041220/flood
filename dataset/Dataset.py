@@ -32,6 +32,33 @@ def get_grids(pickle_path):
     return grid_dict
 
 
+def find_data_path(root_path, relative_path):
+    """
+    查找数据的实际路径。数据可能存储在 00-10 的任一文件夹中。
+    
+    Args:
+        root_path: 数据根目录，如 KuroSiwo/data
+        relative_path: 相对路径，如 118/01/xxx
+    
+    Returns:
+        完整的绝对路径
+    """
+    # 首先尝试直接路径
+    direct_path = os.path.join(root_path, relative_path)
+    if os.path.exists(direct_path):
+        return direct_path
+    
+    # 如果直接路径不存在，在 00-10 文件夹中查找
+    for folder_num in range(11):  # 00 到 10
+        folder_name = f"{folder_num:02d}"
+        test_path = os.path.join(root_path, folder_name, relative_path)
+        if os.path.exists(test_path):
+            return test_path
+    
+    # 如果都找不到，返回原始路径（让后续代码报错以便调试）
+    return direct_path
+
+
 class Dataset(torch.utils.data.Dataset):
     def __init__(self, mode="train", configs=None):
         self.train_acts = configs["train_acts"]
@@ -521,9 +548,19 @@ class Dataset(torch.utils.data.Dataset):
 
         min_max_random_events = {}
         for record in records:
-            filespath = Path(record["path"])
-            filespath = self.root_path / filespath
+            # 使用新的路径查找函数
+            filespath = find_data_path(self.root_path, record["path"])
+            filespath = Path(filespath)
 
+            # Initialize variables
+            valid_mask = None
+            flood_vv = None
+            flood_vh = None
+            sec1_vv = None
+            sec1_vh = None
+            sec2_vv = None
+            sec2_vh = None
+            
             for file in filespath.glob("*"):
                 if "xml" not in file.name:
                     if file.stem.startswith("MK0_MNA"):
@@ -547,6 +584,11 @@ class Dataset(torch.utils.data.Dataset):
                     elif file.stem.startswith("SL2_IVH"):
                         # Get sl2 vh channel
                         sec2_vh = cv.imread(str(file), cv.IMREAD_ANYDEPTH)
+            
+            # Skip if any required data is missing
+            if valid_mask is None:
+                print(f"Warning: Missing valid_mask for {filespath}, skipping...")
+                continue
             
             invalid_mask = valid_mask != 1
 
@@ -650,8 +692,8 @@ class Dataset(torch.utils.data.Dataset):
         else:
             sample = self.records[index]
 
-        path = sample["path"]
-        path = os.path.join(self.root_path, path)
+        # 使用新的路径查找函数
+        path = find_data_path(self.root_path, sample["path"])
         files = os.listdir(path)
         clz = sample["clz"]
         activation = sample["activation"]
@@ -1091,8 +1133,8 @@ class SLCDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         sample = self.records[idx]
 
-        path = os.path.join(sample["path"])
-        path = os.path.join(self.root_path, path)
+        # 使用新的路径查找函数
+        path = find_data_path(self.root_path, sample["path"])
         files = os.listdir(path)
         clz = sample["clz"]
         activation = sample["activation"]
